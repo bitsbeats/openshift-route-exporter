@@ -1,3 +1,6 @@
-openshift-route-exporter
+/openshift-route-exporter
+/openshift-route-exporter-linux-amd64
+
 data/
 logins/
+*example.com.yaml

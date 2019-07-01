@@ -14,10 +14,10 @@ type (
 	}
 )
 
-func NewExporter(exporterName string, exportDir string) (e Exporter, err error) {
+func NewExporter(exporterName string, exportDir string, callbacks []func(error)) (e Exporter, err error) {
 	switch exporterName {
 	case prometheusExporterName:
-		return NewPrometheusExporter(exportDir), nil
+		return NewPrometheusExporter(exportDir, callbacks), nil
 	default:
 		return nil, fmt.Errorf("exporter '%s' does not exist", exporterName)
 	}

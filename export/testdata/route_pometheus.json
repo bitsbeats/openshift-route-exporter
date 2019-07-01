@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "name": "prometheus",
+    "namespace": "prometheus",
+    "selfLink": "/apis/route.openshift.io/v1/namespaces/prometheus/routes/prometheus",
+    "uid": "c90e039f-8eab-4a2c-a211-710e89b0a4be",
+    "resourceVersion": "9001",
+    "creationTimestamp": "2019-03-29T10:40:16Z",
+    "annotations": {
+      "openshift.io/host.generated": "true"
+    }
+  },
+  "spec": {
+    "host": "prometheus-prometheus.apps.example.com",
+    "to": {
+      "kind": "Service",
+      "name": "prometheus",
+      "weight": 100
+    },
+    "port": {
+      "targetPort": "prometheus-https"
+    },
+    "tls": {
+      "termination": "reencrypt",
+      "insecureEdgeTerminationPolicy": "Redirect"
+    },
+    "wildcardPolicy": "None"
+  },
+  "status": {
+    "ingress": [
+      {
+        "host": "prometheus-prometheus.apps.example.com",
+        "routerName": "router",
+        "conditions": [
+          {
+            "type": "Admitted",
+            "status": "True",
+            "lastTransitionTime": "2019-03-29T10:40:16Z"
+          }
+        ],
+        "wildcardPolicy": "None"
+      }
+    ]
+  }
+}

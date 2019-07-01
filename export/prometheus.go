@@ -6,13 +6,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
-	v1 "github.com/openshift/api/route/v1"
 	"github.com/bitsbeats/openshift-route-exporter/watch"
+	v1 "github.com/openshift/api/route/v1"
 	kwatch "k8s.io/apimachinery/pkg/watch"
 )
 
@@ -20,14 +20,16 @@ const prometheusExporterName = "prometheus"
 
 // PrometheusExporter exposes for Prometheus
 type PrometheusExporter struct {
-	exportDir string
+	exportDir  string
 	reloadChan chan interface{}
+	callbacks  []func(error)
 }
 
 // NewPrometheusExporter creates a new PrometheusExporter
-func NewPrometheusExporter(exportDir string) *PrometheusExporter {
+func NewPrometheusExporter(exportDir string, callbacks []func(error)) *PrometheusExporter {
 	c := make(chan interface{})
-	p := &PrometheusExporter{exportDir, c}
+	p := &PrometheusExporter{exportDir, c, callbacks}
+	p.callbacks = append(p.callbacks, p.reload)
 	go p.reloadTimer()
 	return p
 }
@@ -44,44 +46,56 @@ type (
 func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 	for event := range c {
 		r := event.Event.Object.(*v1.Route)
-		fname := fmt.Sprintf("%s.yaml", r.Spec.Host)
+		fname := fmt.Sprintf("%s.json", r.Spec.Host)
 		fpath := filepath.Join(p.exportDir, fname)
 
 		switch event.Event.Type {
 		case kwatch.Added, kwatch.Modified:
 			w, err := os.Create(fpath)
 			if err != nil {
-				log.Printf("unable to create %s", fpath)
+				err := fmt.Errorf("unable to create %s", fpath)
+				p.trigger(err)
 				continue
 			}
 			config := promConfig{{
-				Lables:  event.Labels(),
+				Lables:  event.Labels,
 				Targets: []string{r.Spec.Host},
 			}}
 			err = json.NewEncoder(w).Encode(config)
 			if err != nil {
-				log.Printf("unable to write %s", fpath)
+				fmt.Errorf("unable to write %s", fpath)
+				p.trigger(err)
 				continue
 			}
 			_ = w.Close()
-			p.reload()
-			log.Printf("added/modified %s, labels: %+v", r.Spec.Host, event.Labels())
+			log.Printf("added/modified %s, labels: %+v", r.Spec.Host, event.Labels)
+			p.trigger(nil)
 		case kwatch.Deleted:
 			err := os.Remove(fpath)
 			if err != nil {
-				log.Printf("unable to delete %s", fpath)
+				fmt.Errorf("unable to delete %s", fpath)
+				p.trigger(err)
 				continue
 			}
-			p.reload()
-			log.Printf("deleted %s, labels: %+v", r.Spec.Host, event.Labels())
+			log.Printf("deleted %s, labels: %+v", r.Spec.Host, event.Labels)
+			p.trigger(nil)
 		case kwatch.Error:
 			log.Printf("error %+v", r.Spec.Host)
+			p.trigger(nil)
 		}
 	}
 }
 
-func (p *PrometheusExporter) reload() {
-	p.reloadChan<-nil
+func (p *PrometheusExporter) trigger(err error) {
+	for _, f := range p.callbacks {
+		f(err)
+	}
+}
+
+func (p *PrometheusExporter) reload(err error) {
+	if err == nil {
+		p.reloadChan <- nil
+	}
 }
 
 func (p *PrometheusExporter) reloadTimer() {
@@ -90,7 +104,7 @@ func (p *PrometheusExporter) reloadTimer() {
 		if t != nil {
 			t.Stop()
 		}
-		t = time.AfterFunc(50 * time.Millisecond, p.reloadNow)
+		t = time.AfterFunc(50*time.Millisecond, p.reloadNow)
 	}
 }
 

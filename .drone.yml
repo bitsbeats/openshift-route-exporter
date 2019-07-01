@@ -1,0 +1,26 @@
+kind: pipeline
+name: default
+
+steps:
+
+  - name: build
+    image: golang:alpine
+    environment:
+      CGO_ENABLED: 0
+    commands:
+      - apk --no-cache add git
+      - go build -o openshift-route-exporter-linux-amd64 ./cmd/openshift-route-exporter
+
+  - name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_token
+      files:
+        - openshift-route-exporter-linux-amd64
+      checksum:
+        - md5
+        - sha1
+        - sha256
+    when:
+      event: tag
