@@ -58,7 +58,7 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 		case kwatch.Added, kwatch.Modified:
 			w, err := os.Create(fpath)
 			if err != nil {
-				err := fmt.Errorf("unable to create %s", fpath)
+				err := fmt.Errorf("unable to create %s %s", fpath, err)
 				p.trigger(err)
 				continue
 			}
@@ -68,7 +68,7 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 			}}
 			err = json.NewEncoder(w).Encode(config)
 			if err != nil {
-				fmt.Errorf("unable to write %s", fpath)
+				err := fmt.Errorf("unable to write %s %s", fpath, err)
 				p.trigger(err)
 				continue
 			}
@@ -78,7 +78,7 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 		case kwatch.Deleted:
 			err := os.Remove(fpath)
 			if err != nil {
-				fmt.Errorf("unable to delete %s", fpath)
+				err := fmt.Errorf("unable to delete %s %s", fpath, err)
 				p.trigger(err)
 				continue
 			}
@@ -105,7 +105,7 @@ func (p *PrometheusExporter) reload(err error) {
 
 func (p *PrometheusExporter) reloadTimer() {
 	var t *time.Timer
-	for _ = range p.reloadChan {
+	for range p.reloadChan {
 		if t != nil {
 			t.Stop()
 		}

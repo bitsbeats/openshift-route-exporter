@@ -2,5 +2,5 @@
 /openshift-route-exporter-linux-amd64
 
 data/
-logins/
+config/
 *example.com.yaml
