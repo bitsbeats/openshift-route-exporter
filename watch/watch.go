@@ -70,7 +70,10 @@ func (w *Watcher) Watch(ctx context.Context) (c chan Event, err error) {
 	outer:
 		for {
 			select {
-			case event := <-watcher.ResultChan():
+			case event, ok := <-watcher.ResultChan():
+				if !ok {
+					continue outer
+				}
 				c <- Event{event, w.Labels}
 			case <-ctx.Done():
 				break outer
