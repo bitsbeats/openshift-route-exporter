@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,7 +108,13 @@ func (mw *MultiWatcher) Watch(ctx context.Context) {
 			for {
 				c, err := w.Watch(ctx)
 				if err != nil {
-					log.Printf("unable to connect to %s, retrying", w.kubeconfig)
+					log.Printf("unable to connect to %s \"%s\", retrying", w.kubeconfig, err)
+					select {
+					case <-time.After(time.Second):
+						continue
+					case <-ctx.Done():
+						return
+					}
 				}
 				for event := range c {
 					mw.Sink <- event
