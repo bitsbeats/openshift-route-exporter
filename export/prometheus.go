@@ -45,7 +45,12 @@ type (
 // Consume handles the events from c
 func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 	for event := range c {
-		r := event.Event.Object.(*v1.Route)
+		r, ok := event.Event.Object.(*v1.Route)
+		if !ok {
+			err := fmt.Errorf("unkown object %+v", event.Event.Object)
+			p.trigger(err)
+			continue
+		}
 		fname := fmt.Sprintf("%s.json", r.Spec.Host)
 		fpath := filepath.Join(p.exportDir, fname)
 
