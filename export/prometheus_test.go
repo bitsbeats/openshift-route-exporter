@@ -9,19 +9,20 @@ import (
 	"github.com/bitsbeats/openshift-route-exporter/watch"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/stretchr/testify/assert"
-	kwatch "k8s.io/apimachinery/pkg/watch"
 )
 
 func TestPrometheusExporter(t *testing.T) {
 	// read testdata
-	watcher := kwatch.NewFake()
 	labels := map[string]string{"key": "value"}
 	obj := routev1.Route{}
 	r, err := os.Open("testdata/route_pometheus.json")
 	if err != nil {
 		t.Fatal("undable to find testdata")
 	}
-	json.NewDecoder(r).Decode(&obj)
+	err = json.NewDecoder(r).Decode(&obj)
+	if err != nil {
+		t.Fatalf("undable to load testdata %s", err)
+	}
 
 	// create a callback go get notified
 	events := make(chan watch.Event)
@@ -29,19 +30,13 @@ func TestPrometheusExporter(t *testing.T) {
 	e := NewPrometheusExporter("./testdata", []func(error){
 		func(error) { callback <- err },
 	})
-	go func() {
-		for event := range watcher.ResultChan() {
-			events <- watch.Event{event, labels}
-		}
-		close(events)
-	}()
 
 	// run consumer
 	go e.Consume(events)
 
 	// check create
 	f := "testdata/prometheus-prometheus.apps.example.com.yaml"
-	watcher.Add(&obj)
+	events <- watch.Event{Route: &obj, Type: watch.Added, Labels: labels}
 	err = <-callback
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +50,7 @@ func TestPrometheusExporter(t *testing.T) {
 
 	// check modify
 	labels = map[string]string{"key": "value2"}
-	watcher.Modify(&obj)
+	events <- watch.Event{Route: &obj, Type: watch.Modified, Labels: labels}
 	err = <-callback
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +63,7 @@ func TestPrometheusExporter(t *testing.T) {
 	assert.Equal(t, want, string(got))
 
 	// check delete
-	watcher.Delete(&obj)
+	events <- watch.Event{Route: &obj, Type: watch.Deleted, Labels: labels}
 	err = <-callback
 	if err != nil {
 		t.Fatal(err)

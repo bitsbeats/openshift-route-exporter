@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/bitsbeats/openshift-route-exporter/watch"
-	v1 "github.com/openshift/api/route/v1"
-	kwatch "k8s.io/apimachinery/pkg/watch"
 )
 
 const prometheusExporterName = "prometheus"
@@ -45,17 +43,11 @@ type (
 // Consume handles the events from c
 func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 	for event := range c {
-		r, ok := event.Event.Object.(*v1.Route)
-		if !ok {
-			err := fmt.Errorf("unkown object %+v", event.Event.Object)
-			p.trigger(err)
-			continue
-		}
-		fname := fmt.Sprintf("%s.json", r.Spec.Host)
+		fname := fmt.Sprintf("%s.json", event.Route.Spec.Host)
 		fpath := filepath.Join(p.exportDir, fname)
 
-		switch event.Event.Type {
-		case kwatch.Added, kwatch.Modified:
+		switch event.Type {
+		case watch.Added, watch.Modified:
 			w, err := os.Create(fpath)
 			if err != nil {
 				err := fmt.Errorf("unable to create %s %s", fpath, err)
@@ -64,7 +56,7 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 			}
 			config := promConfig{{
 				Lables:  event.Labels,
-				Targets: []string{r.Spec.Host},
+				Targets: []string{event.Route.Spec.Host},
 			}}
 			err = json.NewEncoder(w).Encode(config)
 			if err != nil {
@@ -73,19 +65,16 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 				continue
 			}
 			_ = w.Close()
-			log.Printf("added/modified %s, labels: %+v", r.Spec.Host, event.Labels)
+			log.Printf("added/modified %s, labels: %+v", event.Route.Spec.Host, event.Labels)
 			p.trigger(nil)
-		case kwatch.Deleted:
+		case watch.Deleted:
 			err := os.Remove(fpath)
 			if err != nil {
 				err := fmt.Errorf("unable to delete %s %s", fpath, err)
 				p.trigger(err)
 				continue
 			}
-			log.Printf("deleted %s, labels: %+v", r.Spec.Host, event.Labels)
-			p.trigger(nil)
-		case kwatch.Error:
-			log.Printf("error %+v", r.Spec.Host)
+			log.Printf("deleted %s, labels: %+v", event.Route.Spec.Host, event.Labels)
 			p.trigger(nil)
 		}
 	}

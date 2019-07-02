@@ -6,10 +6,20 @@ import (
 	"sync"
 	"time"
 
-	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
+	routev1 "github.com/openshift/api/route/v1"
+	csroutev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+type EventType int
+
+const (
+	Added EventType = iota + 1
+	Modified
+	Deleted
 )
 
 type (
@@ -24,7 +34,7 @@ type (
 
 	// Watcher
 	Watcher struct {
-		clientset  *routev1.RouteV1Client
+		clientset  *csroutev1.RouteV1Client
 		kubeconfig string
 		Labels     Labels
 		Cancelled  bool
@@ -38,7 +48,8 @@ type (
 
 	// Event is a wrapper to provide the Openshift event and the labels of the Watcher
 	Event struct {
-		Event  watch.Event
+		Route  *routev1.Route
+		Type   EventType
 		Labels Labels
 	}
 )
@@ -49,7 +60,7 @@ func NewWatcher(c Config) (w *Watcher, err error) {
 	if err != nil {
 		return
 	}
-	clientset, err := routev1.NewForConfig(config)
+	clientset, err := csroutev1.NewForConfig(config)
 	if err != nil {
 		return
 	}
@@ -60,29 +71,44 @@ func NewWatcher(c Config) (w *Watcher, err error) {
 // Watch nonblocking all events from openshift and throw them into c
 func (w *Watcher) Watch(ctx context.Context) (c chan Event, err error) {
 	c = make(chan Event)
-	watcher, err := w.clientset.Routes("").Watch(metav1.ListOptions{})
-	if err != nil {
-		return
-	}
-
-	// consume channel or wait for context cancel
-	go func() {
-	outer:
-		for {
-			select {
-			case event, ok := <-watcher.ResultChan():
+	_, controller := cache.NewInformer(
+		cache.NewListWatchFromClient(
+			w.clientset.RESTClient(), "routes", corev1.NamespaceAll, fields.Everything(),
+		),
+		&routev1.Route{},
+		0*time.Second,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				r, ok := obj.(*routev1.Route)
 				if !ok {
-					continue outer
+					return
 				}
-				c <- Event{event, w.Labels}
-			case <-ctx.Done():
-				break outer
-			}
-		}
+				c <- Event{r, Added, w.Labels}
+			},
+			UpdateFunc: func(old, new interface{}) {
+				r, ok := new.(*routev1.Route)
+				if !ok {
+					return
+				}
+				c <- Event{r, Modified, w.Labels}
+			},
+			DeleteFunc: func(obj interface{}) {
+				r, ok := obj.(*routev1.Route)
+				if !ok {
+					return
+				}
+				c <- Event{r, Deleted, w.Labels}
+			},
+		},
+	)
+
+	// consume or wait for context cancel
+	go func() {
+		controller.Run(ctx.Done())
 		w.Cancelled = true
 		close(c)
 	}()
-	return
+	return c, err
 }
 
 // NewMultiWatcher creates a watcher for multiple configs into one chan
