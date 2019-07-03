@@ -34,7 +34,7 @@ func NewPrometheusExporter(exportDir string, callbacks []func(error)) *Prometheu
 
 type (
 	promConfigItem struct {
-		Lables  map[string]string `json:"lables"`
+		Labels  map[string]string `json:"labels"`
 		Targets []string          `json:"targets"`
 	}
 	promConfig []promConfigItem
@@ -55,7 +55,7 @@ func (p *PrometheusExporter) Consume(c <-chan watch.Event) {
 				continue
 			}
 			config := promConfig{{
-				Lables:  event.Labels,
+				Labels:  event.Labels,
 				Targets: []string{event.Route.Spec.Host},
 			}}
 			err = json.NewEncoder(w).Encode(config)

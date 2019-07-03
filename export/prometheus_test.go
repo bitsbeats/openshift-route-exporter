@@ -45,7 +45,7 @@ func TestPrometheusExporter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("undable to find %s", f)
 	}
-	want := "[{\"lables\":{\"key\":\"value\"},\"targets\":[\"prometheus-prometheus.apps.example.com\"]}]\n"
+	want := "[{\"labels\":{\"key\":\"value\"},\"targets\":[\"prometheus-prometheus.apps.example.com\"]}]\n"
 	assert.Equal(t, want, string(got))
 
 	// check modify
@@ -59,7 +59,7 @@ func TestPrometheusExporter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("undable to find %s", f)
 	}
-	want = "[{\"lables\":{\"key\":\"value2\"},\"targets\":[\"prometheus-prometheus.apps.example.com\"]}]\n"
+	want = "[{\"labels\":{\"key\":\"value2\"},\"targets\":[\"prometheus-prometheus.apps.example.com\"]}]\n"
 	assert.Equal(t, want, string(got))
 
 	// check delete
