@@ -18,7 +18,7 @@ exporter: prometheus
 export_dir: /etc/prometheus/blackbox.d
 ```
 
-Default location for the config is `/etc/openshift-route-expoter/config.yml`.
+Default location for the config is `/etc/openshift-route-exporter/config.yml`.
 One may change this using the `CONFIG` environment variable.
 
 Prometheus configuration:

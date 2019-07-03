@@ -19,7 +19,7 @@ func main() {
 	defer cancel()
 
 	// config
-	configFile := "/etc/openshift-route-expoter/config.yml"
+	configFile := "/etc/openshift-route-exporter/config.yml"
 	if configFileDirFromEnv, ok := os.LookupEnv("CONFIG"); ok {
 		configFile = configFileDirFromEnv
 	}
