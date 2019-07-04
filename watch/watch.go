@@ -58,6 +58,8 @@ const (
 	Deleted
 )
 
+var invalidKeyChars = regexp.MustCompile(`[^a-zA-Z0-9\.]`)
+
 // NewWatcher crates a Wachter
 func NewWatcher(c Config) (w *Watcher, err error) {
 	config, err := clientcmd.BuildConfigFromFlags("", c.Kubeconfig)
@@ -187,8 +189,13 @@ func labelConcat(r *routev1.Route, l Labels) (concat Labels) {
 	concat = Labels{}
 	for _, l := range labels {
 		for k, v := range l {
+			k = stripToValidKey(k)
 			concat[k] = v
 		}
 	}
 	return
+}
+
+func stripToValidKey(s string) string {
+	return invalidKeyChars.ReplaceAllString(s, "_")
 }
