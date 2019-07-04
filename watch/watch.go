@@ -58,7 +58,7 @@ const (
 	Deleted
 )
 
-var invalidKeyChars = regexp.MustCompile(`[^a-zA-Z0-9\.]`)
+var invalidKeyChars = regexp.MustCompile(`[^a-zA-Z0-9]`)
 
 // NewWatcher crates a Wachter
 func NewWatcher(c Config) (w *Watcher, err error) {
