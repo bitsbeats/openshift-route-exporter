@@ -15,15 +15,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type EventType int
-
-const (
-	Added EventType = iota + 1
-	Modified
-	Deleted
-)
-
 type (
+	// EventType
+	EventType int
+
 	// Labels
 	Labels map[string]string
 
@@ -55,6 +50,12 @@ type (
 		Type   EventType
 		Labels Labels
 	}
+)
+
+const (
+	Added EventType = iota + 1
+	Modified
+	Deleted
 )
 
 // NewWatcher crates a Wachter
