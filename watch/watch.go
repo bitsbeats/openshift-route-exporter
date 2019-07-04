@@ -3,6 +3,7 @@ package watch
 import (
 	"context"
 	"log"
+	"regexp"
 	"sync"
 	"time"
 
@@ -28,16 +29,18 @@ type (
 
 	// Config to create a watcher
 	Config struct {
-		Kubeconfig string `yaml:"kubeconfig"`
-		Labels     Labels `yaml:"labels"`
+		Kubeconfig          string `yaml:"kubeconfig"`
+		NamespaceBlackRegex string `yaml:"namespace_blacklist_regex"`
+		Labels              Labels `yaml:"labels"`
 	}
 
 	// Watcher
 	Watcher struct {
-		clientset  *csroutev1.RouteV1Client
-		kubeconfig string
-		Labels     Labels
-		Cancelled  bool
+		clientset           *csroutev1.RouteV1Client
+		kubeconfig          string
+		Labels              Labels
+		Cancelled           bool
+		NamespaceBlackRegex *regexp.Regexp
 	}
 
 	// Multiwatcher
@@ -64,8 +67,15 @@ func NewWatcher(c Config) (w *Watcher, err error) {
 	if err != nil {
 		return
 	}
+	if c.NamespaceBlackRegex == "" {
+		c.NamespaceBlackRegex = "^$"
+	}
+	re, err := regexp.Compile(c.NamespaceBlackRegex)
+	if err != nil {
+		return
+	}
 
-	return &Watcher{clientset, c.Kubeconfig, c.Labels, false}, nil
+	return &Watcher{clientset, c.Kubeconfig, c.Labels, false, re}, nil
 }
 
 // Watch nonblocking all events from openshift and throw them into c
@@ -80,21 +90,22 @@ func (w *Watcher) Watch(ctx context.Context) (c chan Event, err error) {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				r, ok := obj.(*routev1.Route)
-				if !ok {
+				if !ok || !w.validRoute(r) {
 					return
 				}
-				c <- Event{r, Added, w.Labels}
+				labels := labelConcat(r, w.Labels)
+				c <- Event{r, Added, labels}
 			},
 			UpdateFunc: func(old, new interface{}) {
 				r, ok := new.(*routev1.Route)
-				if !ok {
+				if !ok || !w.validRoute(r) {
 					return
 				}
 				c <- Event{r, Modified, w.Labels}
 			},
 			DeleteFunc: func(obj interface{}) {
 				r, ok := obj.(*routev1.Route)
-				if !ok {
+				if !ok || !w.validRoute(r) {
 					return
 				}
 				c <- Event{r, Deleted, w.Labels}
@@ -109,6 +120,11 @@ func (w *Watcher) Watch(ctx context.Context) (c chan Event, err error) {
 		close(c)
 	}()
 	return c, err
+}
+
+func (w *Watcher) validRoute(r *routev1.Route) bool {
+	valid := !w.NamespaceBlackRegex.MatchString(r.ObjectMeta.Namespace)
+	return valid
 }
 
 // NewMultiWatcher creates a watcher for multiple configs into one chan
@@ -159,4 +175,19 @@ func (mw *MultiWatcher) Watch(ctx context.Context) {
 		wg.Wait()
 		close(mw.Sink)
 	}()
+}
+
+func labelConcat(r *routev1.Route, l Labels) (concat Labels) {
+	labels := []Labels{
+		r.ObjectMeta.Labels,
+		l,
+		{"Namespace": r.ObjectMeta.Namespace},
+	}
+	concat = Labels{}
+	for _, l := range labels {
+		for k, v := range l {
+			concat[k] = v
+		}
+	}
+	return
 }
