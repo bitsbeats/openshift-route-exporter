@@ -2,6 +2,10 @@
 
 A small tool to export openshift routed to a monitoring tool.
 
+## Depricated
+
+See https://github.com/bitsbeats/openshift-route-monitor
+
 ## Usage
 
 Configuration is handled via a single yaml file and kubeconfigs:
